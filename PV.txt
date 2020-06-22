@@ -1,0 +1,65 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/sem.h>
+#include <signal.h>
+#include <sys/ipc.h>
+#include <unistd.h>
+void handler( int s ){
+        wait(NULL) ;
+}
+int sem_create( key_t key ){
+        return semget(key,1,IPC_CREAT|0644) ;
+}
+union semun {
+        int val ;
+} ;
+void sem_setval( int id , int val ) {
+        union semun su ;
+        su.val = val ;
+        semctl( id , 0 , SETVAL , su ) ;
+}
+void p( int id ) {
+        struct sembuf sb[1] ;
+        sb[0].sem_num = 0 ;
+        sb[0].sem_op = -1 ;
+        sb[0].sem_flg = 0 ;
+        semop( id , sb , 1 ) ;
+}
+void v( int id ) {
+        struct sembuf sb[1] ;
+        sb[0].sem_num = 0 ;
+        sb[0].sem_op = 1 ;
+        sb[0].sem_flg = 0 ;
+        semop( id , sb , 1 ) ;
+}
+void print_char(int semid , char c ) {
+        int i ;
+        for( i=0 ; i<10 ; ++i ){
+                p(semid) ;
+                printf("%c",c) ;
+                fflush( stdout ) ;
+                sleep(  rand() % 3 ) ;
+                printf("%c",c) ;
+                fflush( stdout ) ;
+                sleep(  rand() % 3 ) ;
+                v(semid) ;
+        }
+}
+int main(){
+        struct sigaction act ;
+        act.sa_handler = handler ;
+        sigemptyset( &act.sa_mask ) ;
+        act.sa_flags = 0 ;
+        sigaction( SIGCHLD , &act  , NULL ) ;
+        srand(getpid()) ;
+        int semid = sem_create(1234) ;
+        sem_setval(semid,1) ;
+        pid_t pid = fork() ;
+        if( pid == 0 ) {
+                print_char(semid,'X') ;
+        } else {
+                print_char(semid,'O') ;
+        }
+}
+    
+                              
